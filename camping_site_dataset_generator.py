@@ -490,8 +490,8 @@ class CampingSiteDatasetGenerator:
         slope_median = np.median(slope_patch[np.isfinite(slope_patch)])
         dem_median = np.median(dem_patch[np.isfinite(dem_patch)])
         
-        # Multiple landcover codes for suitable areas
-        suitable_landcover_codes = [20, 30, 60, 3, 4]  # Common codes for suitable areas
+        # Landcover codes suitable for camping (based on LANDCOVER_LEGEND)
+        suitable_landcover_codes = [20, 30, 60, 100]  # Shrubland, Grassland, Bare/sparse vegetation, Moss and lichen
         landcover_suitable = np.isin(landcover_patch, suitable_landcover_codes)
         
         # Terrain-based suitability
@@ -590,8 +590,8 @@ class CampingSiteDatasetGenerator:
         water_code = None
         
         # Strategy 1: Look for actual water bodies based on official landcover legend
-        # 80 = Permanent water bodies, 90 = Herbaceous wetland
-        water_codes = [80, 90]  # Official water codes from landcover legend
+        # 80 = Permanent water bodies (only this should be considered as water)
+        water_codes = [80]  # Only permanent water bodies, not wetlands
         patch_size = landcover_patch.size
         
         for code in water_codes:
@@ -659,6 +659,8 @@ class CampingSiteDatasetGenerator:
             'total_attempted': 0,
             'high_noise': 0,
             'invalid_terrain': 0,
+            'mixed_landcover': 0,
+            'low_dominance': 0,
             'valid_patches': 0
         }
         
@@ -710,6 +712,18 @@ class CampingSiteDatasetGenerator:
                     # Calculate landcover features
                     landcover_features = self.calculate_landcover_features(landcover_patch)
                     
+                    # Skip patches with too many different landcover types (mixed patches)
+                    if landcover_features['landcover_diversity'] > 6:  # Max 6 different types (more realistic)
+                        filtering_stats['mixed_landcover'] += 1
+                        pbar.update(1)
+                        continue
+                    
+                    # Skip patches where dominant landcover doesn't cover enough area
+                    if landcover_features['dominant_landcover_percentage'] < 40.0:  # At least 40% dominance (more lenient)
+                        filtering_stats['low_dominance'] += 1
+                        pbar.update(1)
+                        continue
+                    
                     # Calculate spatial features
                     spatial_features = self.calculate_spatial_features(landcover_patch, patch_center)
                     
@@ -738,11 +752,22 @@ class CampingSiteDatasetGenerator:
                             suitability_ratio = terrain_ratio
                             label_source = 'terrain'
                         else:
-                            # Try alternative criteria
-                            alt_ratio = debug_info['alt_suitability_ratio']
-                            if alt_ratio > 0.2:
-                                suitability_ratio = alt_ratio
-                                label_source = 'alternative'
+                            # Try texture-based criteria for smooth, uniform surfaces (adjusted thresholds)
+                            texture_suitable = (
+                                texture_features['texture_homogeneity'] > 0.08 and   # Relatively smooth terrain
+                                texture_features['texture_contrast'] < 500 and       # Not extremely rough
+                                texture_features['texture_dissimilarity'] < 20       # Relatively uniform surface
+                            )
+                            
+                            if texture_suitable:
+                                suitability_ratio = 0.4  # Moderate suitability based on texture
+                                label_source = 'texture'
+                            else:
+                                # Try alternative criteria as final fallback
+                                alt_ratio = debug_info['alt_suitability_ratio']
+                                if alt_ratio > 0.2:
+                                    suitability_ratio = alt_ratio
+                                    label_source = 'alternative'
                     
                     # Generate final label with lower threshold
                     label = 1 if suitability_ratio > 0.3 else 0  # Reduced from 0.6 to 0.3
@@ -790,6 +815,8 @@ class CampingSiteDatasetGenerator:
         print(f"  Total patches attempted: {filtering_stats['total_attempted']}")
         print(f"  Discarded due to high noise: {filtering_stats['high_noise']} ({filtering_stats['high_noise']/filtering_stats['total_attempted']*100:.1f}%)")
         print(f"  Discarded due to invalid terrain: {filtering_stats['invalid_terrain']} ({filtering_stats['invalid_terrain']/filtering_stats['total_attempted']*100:.1f}%)")
+        print(f"  Discarded due to mixed landcover: {filtering_stats['mixed_landcover']} ({filtering_stats['mixed_landcover']/filtering_stats['total_attempted']*100:.1f}%)")
+        print(f"  Discarded due to low dominance: {filtering_stats['low_dominance']} ({filtering_stats['low_dominance']/filtering_stats['total_attempted']*100:.1f}%)")
         print(f"  Valid patches extracted: {filtering_stats['valid_patches']} ({filtering_stats['valid_patches']/filtering_stats['total_attempted']*100:.1f}%)")
         
         print(f"Extracted {len(patches)} valid patches")
