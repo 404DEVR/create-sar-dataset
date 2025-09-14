@@ -1,0 +1,110 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Data files (IMPORTANT for your SAR project)
+*.tif
+*.tiff
+*.hdf
+*.h5
+*.nc
+*.zarr
+# Keep data folder structure but ignore large files
+data/*.tif
+data/*.tiff
+data/*.hdf
+data/*.h5
+datasets/
+*.csv
+*.pkl
+*.pickle
+
+# Model files
+*.model
+*.joblib
+*.h5
+models/*.model
+models/*.joblib
+models/*.h5
+checkpoints/
+
+# Logs and temporary files
+*.log
+logs/
+temp/
+tmp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# SAR/GIS specific
+*.aux.xml
+*.ovr
+*.prj
+*.shx
+*.dbf
+*.cpg
+*.qpj
+
+# Output files
+output/*.csv
+output/*.json
+results/*.csv
+results/*.json
+results/*.png
+results/*.pdf
+figures/
+plots/
+
+# Keep folder structure but ignore contents
+camping_site_output/*.csv
+camping_site_output/*.json

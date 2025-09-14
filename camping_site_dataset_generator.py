@@ -30,6 +30,21 @@ class CampingSiteDatasetGenerator:
     Main class for generating camping site suitability dataset from satellite images.
     """
     
+    # Landcover legend for interpreting landcover codes
+    LANDCOVER_LEGEND = {
+        10: "Tree cover",
+        20: "Shrubland", 
+        30: "Grassland",
+        40: "Cropland",
+        50: "Built-up",
+        60: "Bare / sparse vegetation",
+        70: "Snow and ice",
+        80: "Permanent water bodies",
+        90: "Herbaceous wetland",
+        95: "Mangroves",
+        100: "Moss and lichen"
+    }
+    
     def __init__(self, patch_size=50, stride=25, suitability_threshold=0.3, 
                  noise_threshold=1.2, lee_filter_threshold=0.8):
         """
@@ -521,6 +536,37 @@ class CampingSiteDatasetGenerator:
             'texture_homogeneity': homogeneity
         }
     
+    def calculate_landcover_features(self, landcover_patch):
+        """
+        Calculate landcover features including dominant landcover type.
+        
+        Args:
+            landcover_patch (array): Landcover patch
+            
+        Returns:
+            dict: Dictionary containing landcover features
+        """
+        # Get unique values and their counts
+        unique_vals, counts = np.unique(landcover_patch, return_counts=True)
+        
+        # Find dominant landcover type (most frequent value)
+        dominant_code = unique_vals[np.argmax(counts)]
+        dominant_count = np.max(counts)
+        dominant_percentage = (dominant_count / landcover_patch.size) * 100
+        
+        # Get landcover type name from legend
+        dominant_type = self.LANDCOVER_LEGEND.get(dominant_code, f"Unknown ({dominant_code})")
+        
+        # Calculate landcover diversity (number of different types)
+        landcover_diversity = len(unique_vals)
+        
+        return {
+            'dominant_landcover_code': dominant_code,
+            'dominant_landcover_type': dominant_type,
+            'dominant_landcover_percentage': dominant_percentage,
+            'landcover_diversity': landcover_diversity
+        }
+    
     def calculate_spatial_features(self, landcover_patch, patch_center):
         """
         Calculate spatial features including distance to water with intelligent water detection.
@@ -661,6 +707,9 @@ class CampingSiteDatasetGenerator:
                     # Calculate texture features
                     texture_features = self.calculate_texture_features(sar_patch)
                     
+                    # Calculate landcover features
+                    landcover_features = self.calculate_landcover_features(landcover_patch)
+                    
                     # Calculate spatial features
                     spatial_features = self.calculate_spatial_features(landcover_patch, patch_center)
                     
@@ -704,6 +753,10 @@ class CampingSiteDatasetGenerator:
                         'row': patch_center[0],
                         'col': patch_center[1],
                         'label_id': label_id,
+                        'dominant_landcover_code': landcover_features['dominant_landcover_code'],
+                        'dominant_landcover_type': landcover_features['dominant_landcover_type'],
+                        'dominant_landcover_percentage': landcover_features['dominant_landcover_percentage'],
+                        'landcover_diversity': landcover_features['landcover_diversity'],
                         'alpha_mean': sar_features['alpha_mean'],
                         'gamma_mean': sar_features['gamma_mean'],
                         'sigma_mean': sar_features['sigma_mean'],
@@ -870,6 +923,10 @@ class CampingSiteDatasetGenerator:
             },
             'dataset_statistics': validation_results,
             'feature_descriptions': {
+                'dominant_landcover_code': 'Most frequent landcover code in patch',
+                'dominant_landcover_type': 'Most frequent landcover type name in patch',
+                'dominant_landcover_percentage': 'Percentage of patch covered by dominant landcover type',
+                'landcover_diversity': 'Number of different landcover types in patch',
                 'alpha_mean': 'Average alpha decomposition value from G0 distribution',
                 'gamma_mean': 'Average gamma value from G0 distribution',
                 'sigma_mean': 'Average sigma backscatter coefficient',
@@ -883,7 +940,8 @@ class CampingSiteDatasetGenerator:
                 'noise_level': 'Coefficient of variation (std/mean) of SAR patch',
                 'suitability_ratio': 'Fraction of pixels labeled as suitable',
                 'label': 'Binary suitability label (1=suitable, 0=not suitable)'
-            }
+            },
+            'landcover_legend': self.LANDCOVER_LEGEND
         }
         
         return metadata
@@ -950,6 +1008,19 @@ def main():
     """
     Main function to run the dataset generation.
     """
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Generate camping site suitability dataset')
+    parser.add_argument('--sar', help='Path to SAR image')
+    parser.add_argument('--dem', help='Path to DEM image')
+    parser.add_argument('--slope', help='Path to slope image')
+    parser.add_argument('--landcover', help='Path to landcover image')
+    parser.add_argument('--label', help='Path to label mask image')
+    parser.add_argument('--coherence', help='Path to coherence image (optional)')
+    parser.add_argument('--output', default='camping_site_output', help='Output directory')
+    
+    args = parser.parse_args()
+    
     # Initialize the generator
     generator = CampingSiteDatasetGenerator(
         patch_size=50,
@@ -959,15 +1030,28 @@ def main():
         lee_filter_threshold=0.6
     )
     
-    # Example usage - replace with your actual image paths
-    image_paths = {
-        'sar_path': 'sar_image.tif',
-        'dem_path': 'dem_image.tif', 
-        'slope_path': 'slope_image.tif',
-        'landcover_path': 'landcover_image.tif',
-        'label_path': 'label_mask.tif',
-        'coherence_path': 'coherence_image.tif'  # Optional
-    }
+    # Use command line arguments if provided, otherwise use default paths
+    if args.sar and args.dem and args.slope and args.landcover and args.label:
+        image_paths = {
+            'sar_path': args.sar,
+            'dem_path': args.dem,
+            'slope_path': args.slope,
+            'landcover_path': args.landcover,
+            'label_path': args.label,
+            'coherence_path': args.coherence
+        }
+        output_dir = args.output
+    else:
+        # Default paths using your Tso Moriri files in data/ folder
+        image_paths = {
+            'sar_path': 'data/SAR_Image_5k_Tso_Moriri.tif',
+            'dem_path': 'data/DEM_5km_Tso_Moriri.tif', 
+            'slope_path': 'data/Slope_5k_Tso_Moriri.tif',
+            'landcover_path': 'data/Landcover_Image_5k_Tso_Moriri.tif',
+            'label_path': 'data/labels_Tso_Moriri.png',
+            'coherence_path': 'data/Coherence_Stability_5km__Tso_Moriri.tif'
+        }
+        output_dir = 'camping_site_output'
     
     # Generate dataset
     try:
@@ -978,7 +1062,7 @@ def main():
             landcover_path=image_paths['landcover_path'],
             label_path=image_paths['label_path'],
             coherence_path=image_paths['coherence_path'],
-            output_dir='camping_site_output'
+            output_dir=output_dir
         )
         
         print("\nDataset generation completed successfully!")

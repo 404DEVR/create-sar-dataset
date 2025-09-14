@@ -3,13 +3,17 @@
 Test script to understand water detection in landcover data
 """
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import rasterio
 from camping_site_dataset_generator import CampingSiteDatasetGenerator
 
 def test_water_detection():
     # Load landcover image
-    with rasterio.open('Landcover_Image_5k_Tso_Moriri.tif') as src:
+    with rasterio.open('../data/Landcover_Image_5k_Tso_Moriri.tif') as src:
         landcover = src.read(1)
 
     print('Landcover unique values:', np.unique(landcover))

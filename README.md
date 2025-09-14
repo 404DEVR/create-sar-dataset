@@ -58,7 +58,7 @@ df, metadata = generator.generate_dataset(
 Run the example script to test with generated sample data:
 
 ```bash
-python example_usage.py
+python scripts/example_usage.py
 ```
 
 ## Input Images
